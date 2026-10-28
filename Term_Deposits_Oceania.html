@@ -1,0 +1,821 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>DCS / FCS Deposit Taker Database</title>
+<style>
+  :root { font-family: Arial, sans-serif; color:#171717; background:#f5f6f8; }
+  body { margin:0; }
+  header { background:#111827; color:white; padding:22px 28px; }
+  .home-link { display:inline-block; margin-bottom:12px; color:white; text-decoration:none; background:#374151; border:1px solid #6b7280; border-radius:7px; padding:8px 12px; font-size:14px; font-weight:600; }
+  .home-link:hover { background:#4b5563; }
+  header h1 { margin:0 0 6px; font-size:26px; }
+  header p { margin:0; opacity:.8; }
+  main { max-width:1700px; margin:22px auto; padding:0 18px; }
+  .panel { background:white; border:1px solid #ddd; border-radius:10px; padding:18px; margin-bottom:18px; box-shadow:0 1px 3px #0000000d; }
+  .controls { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+  .search-box { flex:1; min-width:200px; }
+  input, select, button { font:inherit; padding:10px 12px; border:1px solid #bbb; border-radius:7px; }
+  input:focus, select:focus { outline:2px solid #93c5fd; }
+  input[readonly] { background:#f3f4f6; color:#374151; }
+  button { cursor:pointer; background:#111827; color:white; border-color:#111827; }
+  button.secondary { background:white; color:#111827; }
+  button.danger { background:#991b1b; border-color:#991b1b; }
+  button.approve { background:#166534; border-color:#166534; }
+  button.blacklist { background:#b91c1c; border-color:#b91c1c; }
+  button.review { background:#6b7280; border-color:#6b7280; }
+  .filter-buttons { display:flex; gap:8px; flex-wrap:wrap; margin:12px 0; align-items:center; }
+  .filter-buttons .gap { width:10px; }
+  .filter-btn { padding:8px 16px; border-radius:6px; font-weight:600; cursor:pointer; border:2px solid transparent; }
+  .filter-btn.active { border-color:#111827; box-shadow:0 0 0 3px rgba(17,24,39,0.18); }
+  .filter-btn[data-filter="all"] { background:#1f2937; color:white; }
+  .filter-btn[data-filter="NZ"] { background:#1d4ed8; color:white; }
+  .filter-btn[data-filter="AU"] { background:#0f766e; color:white; }
+  .filter-btn[data-filter="APPROVED"] { background:#166534; color:white; }
+  .filter-btn[data-filter="BLACKLISTED"] { background:#b91c1c; color:white; }
+  .filter-btn[data-filter="REVIEW"] { background:#6b7280; color:white; }
+  .formgrid { display:grid; grid-template-columns:repeat(8,1fr); gap:10px; }
+  .formgrid .w2 { grid-column:span 2; }
+  .formgrid .w3 { grid-column:span 3; }
+  .formgrid label select, .formgrid label input { width:100%; box-sizing:border-box; min-width:0; }
+  .formgrid label { display:flex; flex-direction:column; gap:5px; font-size:12px; font-weight:bold; }
+  .stats { display:flex; gap:10px; flex-wrap:wrap; margin:12px 0 0; }
+  .stat { padding:7px 10px; background:#f3f4f6; border-radius:999px; font-size:13px; }
+  .stat b { font-variant-numeric:tabular-nums; }
+  .tfilters { display:flex; gap:14px; flex-wrap:wrap; align-items:flex-end; margin:0 0 12px; }
+  .tfilters label { display:flex; flex-direction:column; gap:4px; font-size:12px; font-weight:bold; }
+  .tfilters select { min-width:150px; }
+  table { width:100%; border-collapse:collapse; font-size:14px; }
+  th,td { padding:8px 6px; border-bottom:1px solid #e5e7eb; text-align:center; vertical-align:middle; overflow-wrap:anywhere; }
+  th { background:#f9fafb; position:sticky; top:0; white-space:nowrap; }
+  th.sortable { cursor:pointer; user-select:none; }
+  th.sortable:hover { background:#e5e7eb; }
+  th.sortable.sorted-asc .sort-indicator::after { content:' ▲'; font-size:11px; }
+  th.sortable.sorted-desc .sort-indicator::after { content:' ▼'; font-size:11px; }
+  td.num, th.num { text-align:center; }
+  td.num { font-variant-numeric:tabular-nums; }
+  tbody tr { transition:background .12s ease, box-shadow .12s ease; }
+  tbody tr:nth-child(even) { background:#fafbfc; }
+  tbody tr:hover { background:#eef6ff; cursor:pointer; }
+  tbody tr.selected { box-shadow:inset 4px 0 0 #2563eb; }
+  tr.blacklisted { color:#a11; background:#fff1f2 !important; }
+  tr.approved { background:#f0fdf4 !important; }
+  tr.blacklisted:hover { background:#ffe4e6 !important; }
+  tr.blacklisted, tr.blacklisted td { color:#991b1b !important; background:#fee2e2 !important; }
+  tr.approved:hover { background:#dcfce7 !important; }
+  .row-number { width:45px; text-align:right; color:#6b7280; font-variant-numeric:tabular-nums; font-weight:600; }
+  .editing-banner { display:none; margin:10px 0 0; padding:10px 12px; border-radius:7px; background:#eff6ff; border:1px solid #bfdbfe; color:#1e40af; font-weight:600; }
+  .editing-banner.active { display:block; }
+  .required-field::after { content:' *'; color:#b91c1c; }
+  .search-controls { display:flex; gap:8px; flex:1; min-width:320px; }
+  .search-controls .search-box { min-width:0; }
+  .search-controls button { white-space:nowrap; }
+  .save-note { margin-top:8px; }
+  .save-status { font-weight:600; }
+  .company { font-weight:800; white-space:normal; min-width:120px; }
+  .cc { font-weight:700; }
+  .status { font-weight:800; white-space:nowrap; }
+  .review { color:#6b7280; } .review-btn { background:#6b7280; color:white; border-color:#6b7280; } .approvedText { color:#166534; } .blackText { color:#b91c1c; }
+  .low { color:#b91c1c; font-weight:700; }
+  .coverage.yes { color:#166534; font-weight:800; } .coverage.no { color:#b91c1c; font-weight:900; }
+  .rate { font-weight:700; }
+  .actions { white-space:nowrap; }
+  .actions button { padding:6px 8px; margin-right:4px; font-size:12px; }
+  td.url a { display:inline-block; max-width:190px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; vertical-align:bottom; }
+  .hint { color:#555; font-size:13px; line-height:1.45; }
+  .empty { padding:25px; text-align:center; color:#666; }
+  .pagination { display:flex; justify-content:center; align-items:center; gap:6px; margin:16px 0; flex-wrap:wrap; }
+  .pagination button { padding:8px 12px; min-width:36px; }
+  .pagination button:disabled { opacity:0.5; cursor:not-allowed; }
+  .pagination .page-info { padding:0 8px; font-size:13px; color:#555; }
+  .tablewrap { overflow-x:auto; }
+  table { min-width:1450px; table-layout:auto; width:100%; }
+  th, td { padding:7px 9px; white-space:nowrap; text-align:center; vertical-align:middle; }
+  th { white-space:nowrap; }
+  td.company { white-space:normal; min-width:145px; max-width:230px; }
+  td.url { min-width:150px; }
+  td.actions { white-space:nowrap; min-width:340px; }
+  .actions button { display:inline-block; vertical-align:middle; margin:2px 3px 2px 0; padding:6px 8px; }
+  tbody tr { height:auto; }
+  tbody tr:hover { cursor:pointer; }
+  .tablewrap { overflow-x:auto; width:100%; }
+  @media(max-width:900px){ table { min-width:1450px; } }
+  @media(max-width:900px){
+    .formgrid { grid-template-columns:1fr 1fr; }
+    .formgrid .w2, .formgrid .w3 { grid-column:span 2; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <a href="main.html" class="home-link">← Back to Home</a>
+  <h1>DCS / FCS Deposit Taker Database</h1>
+  <p>NZ (DCS) and AU (FCS) deposit takers from the official lists. Minimum rate 5%.</p>
+</header>
+<main>
+  <section class="panel">
+    <div class="controls">
+      <div class="search-controls">
+        <input id="search" class="search-box" placeholder="Search Company, Country, Rate, Term..." oninput="handleSearchLive()" onkeydown="if(event.key==='Enter'){handleSearch();}">
+        <button onclick="handleSearch()">Search</button>
+        <button class="secondary" onclick="clearSearch()">Clear</button>
+      </div>
+      <button class="secondary" onclick="document.getElementById('fileInput').click()">Import CSV</button>
+      <input id="fileInput" type="file" accept=".csv,text/csv" style="display:none" onchange="importCSV(event)">
+      <button onclick="saveDatabase()">Save</button>
+      <button class="secondary" onclick="showExportMenu()">Export CSV</button>
+    </div>
+    <div class="stats" id="stats"></div>
+    <div class="filter-buttons">
+      <button class="filter-btn active" data-filter="all" onclick="setFilter('all')">All (<span id="count-all">0</span>)</button>
+      <button class="filter-btn" data-filter="NZ" onclick="setFilter('NZ')">NZ Only (<span id="count-NZ">0</span>)</button>
+      <button class="filter-btn" data-filter="AU" onclick="setFilter('AU')">AU Only (<span id="count-AU">0</span>)</button>
+      <span class="gap"></span>
+      <button class="filter-btn" data-filter="APPROVED" onclick="setFilter('APPROVED')">Approved (<span id="count-APPROVED">0</span>)</button>
+      <button class="filter-btn" data-filter="BLACKLISTED" onclick="setFilter('BLACKLISTED')">Blacklisted (<span id="count-BLACKLISTED">0</span>)</button>
+      <button class="filter-btn" data-filter="REVIEW" onclick="setFilter('REVIEW')">Review (<span id="count-REVIEW">0</span>)</button>
+    </div>
+    <div class="hint">A country button and a status button can be combined, for example AU Only + Approved. Click a lit button again to turn it off, or click All to clear both.</div>
+  </section>
+
+  <section class="panel">
+    <h2 style="margin-top:0">Add / Update Company</h2>
+    <p class="hint">Select a row to edit it. <b>Add</b> creates a new company. <b>Update</b> changes the selected company. Enter the best rate you found and its term. A rate under 5% is blacklisted automatically.</p>
+    <div id="editingBanner" class="editing-banner">Editing: <span id="editingName"></span></div>
+    <div class="formgrid">
+      <label class="w2 required-field">Company<input id="company" placeholder="ASB" autocomplete="off"></label>
+      <label class="required-field">Country
+        <select id="country"><option value="">Choose...</option><option value="NZ">NZ</option><option value="AU">AU</option></select>
+      </label>
+      <label class="required-field">DCS/FCS
+        <select id="dcs"><option value="Yes">Yes</option><option value="No">No</option></select>
+      </label>
+      <label>Paid
+        <select id="paid"><option value="">Choose...</option><option>Monthly</option><option>Quarterly</option><option>Annually</option><option>At Maturity</option></select>
+      </label>
+      <label>Term<input id="term" list="termList" placeholder="1 year" autocomplete="off"></label>
+      <label>Rate (%)<input id="rate" placeholder="5.25" inputmode="decimal" oninput="updateReturnField()"></label>
+      <label>Min-Deposit<input id="minDep" placeholder="5000" inputmode="numeric"></label>
+      <label class="w3">Company URL<input id="url" placeholder="https://www.asb.co.nz"></label>
+      <label class="w2 required-field">Status
+        <select id="status" onchange="updateBlacklistReasonState()">
+          <option value="">Choose...</option>
+          <option value="REVIEW">REVIEW</option>
+          <option value="APPROVED">APPROVED</option>
+          <option value="BLACKLISTED">BLACKLISTED</option>
+        </select>
+      </label>
+      <label class="w2" id="blacklistReasonLabel">Blacklist Reason
+        <select id="blacklistReason" disabled>
+          <option value="">Choose reason...</option>
+        </select>
+      </label>
+    </div>
+    <datalist id="termList"><option value="6 months"><option value="1 year"><option value="18 months"><option value="2 years"><option value="3 years"><option value="4 years"><option value="5 years"></datalist>
+    <br>
+    <button id="addBtn" class="approve" onclick="addCompany()">Add Company</button>
+    <button id="updateBtn" onclick="updateCompany()" disabled>Update Company</button>
+    <button class="secondary" onclick="resetForm()">Reset</button>
+    <div class="hint save-note"><span class="save-status" id="saveStatus"></span></div>
+  </section>
+
+  <section class="panel">
+    <div class="tfilters">
+      <label>Rate
+        <select id="fRate">
+          <option value="">All</option><option value="asc">Ascending order</option><option value="desc">Descending order</option>
+        </select>
+      </label>
+      <label>Term
+        <select id="fTerm">
+          <option value="">All</option><option value="t12">0–12 months</option><option value="t24">1–2 years</option><option value="t48">2–4 years</option><option value="t60">5+ years</option>
+        </select>
+      </label>
+      <label>Min-Deposit
+        <select id="fDep">
+          <option value="">All</option><option value="d10">$1–10,000</option><option value="d50">$10–50,000</option><option value="d100">$100,000+</option>
+        </select>
+      </label>
+      <button onclick="applyFilters()">Apply Filters</button>
+      <button class="secondary" onclick="resetFilters()">Reset Filters</button>
+    </div>
+    <div class="tablewrap">
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th class="sortable" data-sort="country" onclick="toggleSort('country')">Country<span class="sort-indicator"></span></th>
+            <th class="sortable" data-sort="company" onclick="toggleSort('company')">Company<span class="sort-indicator"></span></th>
+            <th>DCS/FCS</th>
+            <th>Paid</th>
+            <th class="sortable" data-sort="term" onclick="toggleSort('term')">Term<span class="sort-indicator"></span></th>
+            <th class="sortable num" data-sort="rate" onclick="toggleSort('rate')">Rate<span class="sort-indicator"></span></th>
+            <th class="sortable num" data-sort="minDep" onclick="toggleSort('minDep')">Min-Deposit<span class="sort-indicator"></span></th>
+            
+            <th>Company URL</th>
+            
+            <th class="sortable" data-sort="status" onclick="toggleSort('status')">Status<span class="sort-indicator"></span></th>
+            <th>Blacklist Reason</th>
+            <th>Action</th>
+            <th class="sortable" data-sort="updated" onclick="toggleSort('updated')">Last Updated<span class="sort-indicator"></span></th>
+          </tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+      </table>
+      <div id="empty" class="empty" style="display:none">No matching companies.</div>
+    </div>
+    <div class="pagination" id="pagination"></div>
+  </section>
+
+  <section class="panel hint">
+    <b>Database:</b> Opens with the full NZ DCS and AU FCS lists. <b>Import CSV</b> merges a file into the list (matching Country + Company are updated, new ones are added). <b>Save</b> downloads the whole list as CSV. Changes are held in memory only, so Save before closing the page.
+  </section>
+</main>
+
+<script>
+const MASTER = [{"country":"NZ","company":"Rabobank NZ","dcs":"Yes","paid":"Annually","term":60,"rate":5.05,"minDep":1000,"url":"https://www.rabobank.co.nz","updated":"2026-10-11","status":"APPROVED","reason":""},{"country":"NZ","company":"ASB","dcs":"Yes","paid":"Quarterly","term":60,"rate":5.0,"minDep":5000,"url":"https://www.asb.co.nz","updated":"2026-10-11","status":"APPROVED","reason":""},{"country":"NZ","company":"Christian Savings","dcs":"Yes","paid":"Annually","term":60,"rate":5.0,"minDep":1000,"url":"https://www.christiansavings.co.nz","updated":"2026-10-11","status":"APPROVED","reason":""},{"country":"NZ","company":"Liberty Financial","dcs":"Yes","paid":"Annually","term":60,"rate":5.0,"minDep":5000,"url":"https://www.libfin.co.nz","updated":"2026-10-11","status":"APPROVED","reason":""},{"country":"NZ","company":"ANZ NZ","dcs":"Yes","paid":"","term":null,"rate":null,"minDep":null,"url":"https://www.anz.co.nz","updated":"","status":"REVIEW","reason":""},{"country":"NZ","company":"Bank of Baroda NZ","dcs":"Yes","paid":"","term":null,"rate":null,"minDep":null,"url":"https://www.barodanzltd.co.nz","updated":"","status":"REVIEW","reason":""},{"country":"NZ","company":"Bank of China NZ","dcs":"Yes","paid":"","term":null,"rate":null,"minDep":null,"url":"https://www.bankofchina.com/nz/en/","updated":"","status":"REVIEW","reason":""},{"country":"NZ","company":"Bank of India NZ","dcs":"Yes","paid":"","term":null,"rate":null,"minDep":null,"url":"https://bankofindia.co.nz","updated":"","status":"REVIEW","reason":""},{"country":"NZ","company":"BNZ","dcs":"Yes","paid":"","term":null,"rate":null,"minDep":null,"url":"https://www.bnz.co.nz","updated":"","status":"REVIEW","reason":""},{"country":"NZ","company":"China Construction Bank NZ","dcs":"Yes","paid":"","term":null,"rate":null,"minDep":null,"url":"https://nz.ccb.com","updated":"","status":"REVIEW","reason":""},{"country":"NZ","company":"Finance Direct","dcs":"Yes","paid":"","term":null,"rate":null,"minDep":null,"url":"https://www.financedirect.co.nz","updated":"","status":"REVIEW","reason":""},{"country":"NZ","company":"First Credit Union","dcs":"Yes","paid":"","term":null,"rate":null,"minDep":null,"url":"https://www.firstcreditunion.co.nz","updated":"","status":"REVIEW","reason":""},{"country":"NZ","company":"General Finance","dcs":"Yes","paid":"","term":null,"rate":null,"minDep":null,"url":"https://generalfinance.co.nz","updated":"","status":"REVIEW","reason":""},{"country":"NZ","company":"Gold Band Finance","dcs":"Yes","paid":"","term":null,"rate":null,"minDep":null,"url":"https://goldbandfinance.nz","updated":"","status":"REVIEW","reason":""},{"country":"NZ","company":"Heartland Bank","dcs":"Yes","paid":"","term":null,"rate":null,"minDep":null,"url":"https://www.heartland.co.nz","updated":"","status":"REVIEW","reason":""},{"country":"NZ","company":"Heretaunga Building Society","dcs":"Yes","paid":"","term":null,"rate":null,"minDep":null,"url":"https://www.heretaungabuildingsociety.co.nz","updated":"","status":"REVIEW","reason":""},{"country":"NZ","company":"ICBC NZ","dcs":"Yes","paid":"","term":null,"rate":null,"minDep":null,"url":"https://nz.icbc.com.cn","updated":"","status":"REVIEW","reason":""},{"country":"NZ","company":"Kiwibank","dcs":"Yes","paid":"","term":null,"rate":null,"minDep":null,"url":"https://www.kiwibank.co.nz","updated":"","status":"REVIEW","reason":""},{"country":"NZ","company":"Mutual Credit Finance","dcs":"Yes","paid":"","term":null,"rate":null,"minDep":null,"url":"https://mcf.co.nz","updated":"","status":"REVIEW","reason":""},{"country":"NZ","company":"Nelson Building Society","dcs":"Yes","paid":"","term":null,"rate":null,"minDep":null,"url":"https://www.nbs.co.nz","updated":"","status":"REVIEW","reason":""},{"country":"NZ","company":"Police and Families Credit Union","dcs":"Yes","paid":"","term":null,"rate":null,"minDep":null,"url":"https://www.policecu.org.nz","updated":"","status":"REVIEW","reason":""},{"country":"NZ","company":"SBS Bank","dcs":"Yes","paid":"","term":null,"rate":null,"minDep":null,"url":"https://www.sbsbank.co.nz","updated":"","status":"REVIEW","reason":""},{"country":"NZ","company":"The Co-operative Bank","dcs":"Yes","paid":"","term":null,"rate":null,"minDep":null,"url":"https://www.co-operativebank.co.nz","updated":"","status":"REVIEW","reason":""},{"country":"NZ","company":"TSB","dcs":"Yes","paid":"","term":null,"rate":null,"minDep":null,"url":"https://www.tsb.co.nz","updated":"","status":"REVIEW","reason":""},{"country":"NZ","company":"Unity Credit Union","dcs":"Yes","paid":"","term":null,"rate":null,"minDep":null,"url":"https://www.unitymoney.co.nz","updated":"","status":"REVIEW","reason":""},{"country":"NZ","company":"Wairarapa Building Society","dcs":"Yes","paid":"","term":null,"rate":null,"minDep":null,"url":"https://wbs.net.nz","updated":"","status":"REVIEW","reason":""},{"country":"NZ","company":"Welcome","dcs":"Yes","paid":"","term":null,"rate":null,"minDep":null,"url":"https://www.welcome.co.nz","updated":"","status":"REVIEW","reason":""},{"country":"NZ","company":"Westpac NZ","dcs":"Yes","paid":"","term":null,"rate":null,"minDep":null,"url":"https://www.westpac.co.nz","updated":"","status":"REVIEW","reason":""},{"country":"NZ","company":"Xceda Finance","dcs":"Yes","paid":"","term":null,"rate":null,"minDep":null,"url":"https://www.xceda.co.nz","updated":"","status":"REVIEW","reason":""},{"country":"AU","company":"Rabobank","dcs":"Yes","paid":"Annually","term":60,"rate":5.7,"minDep":1000,"url":"https://www.rabobank.com.au","updated":"2026-10-11","status":"APPROVED","reason":""},{"country":"AU","company":"Community First Bank","dcs":"Yes","paid":"At Maturity","term":12,"rate":5.6,"minDep":10000,"url":"https://www.communityfirst.com.au","updated":"2026-10-11","status":"APPROVED","reason":""},{"country":"AU","company":"Unity Bank","dcs":"Yes","paid":"Annually","term":24,"rate":5.55,"minDep":1000,"url":"https://www.unitybank.com.au","updated":"2026-10-11","status":"APPROVED","reason":""},{"country":"AU","company":"Bank Australia","dcs":"Yes","paid":"At Maturity","term":12,"rate":5.5,"minDep":500,"url":"https://www.bankaust.com.au","updated":"2026-10-11","status":"APPROVED","reason":""},{"country":"AU","company":"Bank First","dcs":"Yes","paid":"At Maturity","term":12,"rate":5.5,"minDep":1000,"url":"https://www.bankfirst.com.au","updated":"2026-10-11","status":"APPROVED","reason":""},{"country":"AU","company":"Gateway Bank","dcs":"Yes","paid":"At Maturity","term":12,"rate":5.5,"minDep":1000,"url":"https://www.gatewaybank.com.au","updated":"2026-10-11","status":"APPROVED","reason":""},{"country":"AU","company":"Heartland Bank","dcs":"Yes","paid":"At Maturity","term":12,"rate":5.5,"minDep":5000,"url":"https://www.heartlandbank.com.au","updated":"2026-10-11","status":"APPROVED","reason":""},{"country":"AU","company":"Qudos Bank","dcs":"Yes","paid":"At Maturity","term":12,"rate":5.5,"minDep":10000,"url":"https://www.qudosbank.com.au","updated":"2026-10-11","status":"APPROVED","reason":""},{"country":"AU","company":"Suncorp Bank","dcs":"Yes","paid":"Annually","term":24,"rate":5.5,"minDep":5000,"url":"https://www.suncorp.com.au/banking","updated":"2026-10-11","status":"APPROVED","reason":""},{"country":"AU","company":"Judo Bank","dcs":"Yes","paid":"Annually","term":36,"rate":5.45,"minDep":1000,"url":"https://www.judo.bank","updated":"2026-10-11","status":"APPROVED","reason":""},{"country":"AU","company":"RACQ Bank","dcs":"Yes","paid":"At Maturity","term":6,"rate":5.45,"minDep":1000,"url":"https://www.racqbank.com.au","updated":"2026-10-11","status":"APPROVED","reason":""},{"country":"AU","company":"Australian Mutual Bank","dcs":"Yes","paid":"Monthly","term":12,"rate":5.35,"minDep":1000,"url":"https://www.australianmutual.bank","updated":"2026-10-11","status":"APPROVED","reason":""},{"country":"AU","company":"ANZ","dcs":"Yes","paid":"Annually","term":18,"rate":5.3,"minDep":5000,"url":"https://www.anz.com.au","updated":"2026-10-11","status":"APPROVED","reason":""},{"country":"AU","company":"Bankwest","dcs":"Yes","paid":"Annually","term":18,"rate":5.3,"minDep":1000,"url":"https://www.bankwest.com.au","updated":"2026-10-11","status":"APPROVED","reason":""},{"country":"AU","company":"Defence Bank","dcs":"Yes","paid":"Annually","term":24,"rate":5.25,"minDep":1000,"url":"https://www.defencebank.com.au","updated":"2026-10-11","status":"APPROVED","reason":""},{"country":"AU","company":"Heritage Bank","dcs":"Yes","paid":"Annually","term":36,"rate":5.25,"minDep":1000,"url":"https://www.heritage.com.au","updated":"2026-10-11","status":"APPROVED","reason":""},{"country":"AU","company":"ING","dcs":"Yes","paid":"Annually","term":12,"rate":5.25,"minDep":1000,"url":"https://www.ing.com.au","updated":"2026-10-11","status":"APPROVED","reason":""},{"country":"AU","company":"MOVE Bank","dcs":"Yes","paid":"Annually","term":11,"rate":5.25,"minDep":1000,"url":"https://www.movebank.com.au","updated":"2026-10-11","status":"APPROVED","reason":""},{"country":"AU","company":"People First Bank","dcs":"Yes","paid":"Annually","term":36,"rate":5.25,"minDep":5000,"url":"https://www.peoplefirstbank.com.au","updated":"2026-10-11","status":"APPROVED","reason":""},{"country":"AU","company":"NAB","dcs":"Yes","paid":"Monthly","term":12,"rate":5.2,"minDep":5000,"url":"https://www.nab.com.au","updated":"2026-10-11","status":"APPROVED","reason":""},{"country":"AU","company":"BCU Bank","dcs":"Yes","paid":"Monthly","term":6,"rate":5.1,"minDep":1000,"url":"","updated":"2026-10-11","status":"APPROVED","reason":""},{"country":"AU","company":"IMB Bank","dcs":"Yes","paid":"Annually","term":36,"rate":5.0,"minDep":1000,"url":"https://www.imb.com.au","updated":"2026-10-11","status":"APPROVED","reason":""},{"country":"AU","company":"Westpac","dcs":"Yes","paid":"Annually","term":12,"rate":5.0,"minDep":5000,"url":"https://www.westpac.com.au","updated":"2026-10-11","status":"APPROVED","reason":""},{"country":"AU","company":"Adelaide Bank","dcs":"Yes","paid":"","term":null,"rate":null,"minDep":null,"url":"","updated":"","status":"REVIEW","reason":""},{"country":"AU","company":"Alex Bank","dcs":"Yes","paid":"","term":null,"rate":null,"minDep":null,"url":"","updated":"","status":"REVIEW","reason":""},{"country":"AU","company":"AMP Bank","dcs":"Yes","paid":"","term":null,"rate":null,"minDep":null,"url":"https://www.amp.com.au/banking","updated":"","status":"REVIEW","reason":""},{"country":"AU","company":"Arab Bank Australia","dcs":"Yes","paid":"","term":null,"rate":null,"minDep":null,"url":"https://www.arabbank.com.au","updated":"","status":"REVIEW","reason":""},{"country":"AU","company":"Australian Military Bank","dcs":"Yes","paid":"","term":null,"rate":null,"minDep":null,"url":"","updated":"","status":"REVIEW","reason":""},{"country":"AU","company":"Auswide","dcs":"Yes","paid":"","term":null,"rate":null,"minDep":null,"url":"","updated":"","status":"REVIEW","reason":""},{"country":"AU","company":"Avenue Bank","dcs":"Yes","paid":"","term":null,"rate":null,"minDep":null,"url":"","updated":"","status":"REVIEW","reason":""},{"country":"AU","company":"Bank of China Australia","dcs":"Yes","paid":"","term":null,"rate":null,"minDep":null,"url":"https://www.bankofchina.com/au/en/","updated":"","status":"REVIEW","reason":""},{"country":"AU","company":"Bank of Heritage Isle","dcs":"Yes","paid":"","term":null,"rate":null,"minDep":null,"url":"https://www.bohi.com.au","updated":"","status":"REVIEW","reason":""},{"country":"AU","company":"Bank of Melbourne","dcs":"Yes","paid":"","term":null,"rate":null,"minDep":null,"url":"https://www.bankofmelbourne.com.au","updated":"","status":"REVIEW","reason":""},{"country":"AU","company":"Bank of Queensland","dcs":"Yes","paid":"","term":null,"rate":null,"minDep":null,"url":"https://www.boq.com.au","updated":"","status":"REVIEW","reason":""},{"country":"AU","company":"Bank of Sydney","dcs":"Yes","paid":"","term":null,"rate":null,"minDep":null,"url":"https://www.banksyd.com.au","updated":"","status":"REVIEW","reason":""},{"country":"AU","company":"Bank of us","dcs":"Yes","paid":"","term":null,"rate":null,"minDep":null,"url":"","updated":"","status":"REVIEW","reason":""},{"country":"AU","company":"Bank Orange","dcs":"Yes","paid":"","term":null,"rate":null,"minDep":null,"url":"https://www.bankorange.com.au","updated":"","status":"REVIEW","reason":""},{"country":"AU","company":"BankSA","dcs":"Yes","paid":"","term":null,"rate":null,"minDep":null,"url":"https://www.banksa.com.au","updated":"","status":"REVIEW","reason":""},{"country":"AU","company":"BankVic","dcs":"Yes","paid":"","term":null,"rate":null,"minDep":null,"url":"https://www.bankvic.com.au","updated":"","status":"REVIEW","reason":""},{"country":"AU","company":"BankWAW","dcs":"Yes","paid":"","term":null,"rate":null,"minDep":null,"url":"https://www.bankwaw.com.au","updated":"","status":"REVIEW","reason":""},{"country":"AU","company":"Bendigo Bank","dcs":"Yes","paid":"","term":null,"rate":null,"minDep":null,"url":"https://www.bendigobank.com.au","updated":"","status":"REVIEW","reason":""},{"country":"AU","company":"Beyond Bank","dcs":"Yes","paid":"","term":null,"rate":null,"minDep":null,"url":"https://www.beyondbank.com.au","updated":"","status":"REVIEW","reason":""},{"country":"AU","company":"BNK Banking Corporation","dcs":"Yes","paid":"","term":null,"rate":null,"minDep":null,"url":"","updated":"","status":"REVIEW","reason":""},{"country":"AU","company":"BOQ Specialist","dcs":"Yes","paid":"","term":null,"rate":null,"minDep":null,"url":"https://www.boqspecialist.com.au","updated":"","status":"REVIEW","reason":""},{"country":"AU","company":"Border Bank","dcs":"Yes","paid":"","term":null,"rate":null,"minDep":null,"url":"https://www.borderbank.com.au","updated":"","status":"REVIEW","reason":""},{"country":"AU","company":"Broken Hill Bank","dcs":"Yes","paid":"","term":null,"rate":null,"minDep":null,"url":"","updated":"","status":"REVIEW","reason":""},{"country":"AU","company":"Cairns Bank","dcs":"Yes","paid":"","term":null,"rate":null,"minDep":null,"url":"","updated":"","status":"REVIEW","reason":""},{"country":"AU","company":"Central Murray Bank","dcs":"Yes","paid":"","term":null,"rate":null,"minDep":null,"url":"","updated":"","status":"REVIEW","reason":""},{"country":"AU","company":"Central West Credit Union","dcs":"Yes","paid":"","term":null,"rate":null,"minDep":null,"url":"","updated":"","status":"REVIEW","reason":""},{"country":"AU","company":"Coastline Bank","dcs":"Yes","paid":"","term":null,"rate":null,"minDep":null,"url":"https://www.coastline.com.au","updated":"","status":"REVIEW","reason":""},{"country":"AU","company":"Commonwealth Bank","dcs":"Yes","paid":"","term":null,"rate":null,"minDep":null,"url":"https://www.commbank.com.au","updated":"","status":"REVIEW","reason":""},{"country":"AU","company":"Credit Union SA","dcs":"Yes","paid":"","term":null,"rate":null,"minDep":null,"url":"https://www.creditunionsa.com.au","updated":"","status":"REVIEW","reason":""},{"country":"AU","company":"Darling Downs Bank","dcs":"Yes","paid":"","term":null,"rate":null,"minDep":null,"url":"https://www.ddbank.com.au","updated":"","status":"REVIEW","reason":""},{"country":"AU","company":"Dnister Bank","dcs":"Yes","paid":"","term":null,"rate":null,"minDep":null,"url":"https://www.dnister.com.au","updated":"","status":"REVIEW","reason":""},{"country":"AU","company":"Easy Street Financial Services","dcs":"Yes","paid":"","term":null,"rate":null,"minDep":null,"url":"https://www.easystreet.com.au","updated":"","status":"REVIEW","reason":""},{"country":"AU","company":"Fire Service Credit Union","dcs":"Yes","paid":"","term":null,"rate":null,"minDep":null,"url":"https://www.fscu.com.au","updated":"","status":"REVIEW","reason":""},{"country":"AU","company":"Firefighters Mutual Bank","dcs":"Yes","paid":"","term":null,"rate":null,"minDep":null,"url":"https://www.firefightersmutual.com.au","updated":"","status":"REVIEW","reason":""},{"country":"AU","company":"First Option Bank","dcs":"Yes","paid":"","term":null,"rate":null,"minDep":null,"url":"https://www.firstoptionbank.com.au","updated":"","status":"REVIEW","reason":""},{"country":"AU","company":"G&C Mutual Bank","dcs":"Yes","paid":"","term":null,"rate":null,"minDep":null,"url":"https://www.gcmutual.bank","updated":"","status":"REVIEW","reason":""},{"country":"AU","company":"Goldfields Money","dcs":"Yes","paid":"","term":null,"rate":null,"minDep":null,"url":"https://www.goldfieldsmoney.com.au","updated":"","status":"REVIEW","reason":""},{"country":"AU","company":"Goulburn Murray Credit Union","dcs":"Yes","paid":"","term":null,"rate":null,"minDep":null,"url":"https://www.gmcu.com.au","updated":"","status":"REVIEW","reason":""},{"country":"AU","company":"Great Southern Bank","dcs":"Yes","paid":"","term":null,"rate":null,"minDep":null,"url":"https://www.greatsouthernbank.com.au","updated":"","status":"REVIEW","reason":""},{"country":"AU","company":"Greater Bank","dcs":"Yes","paid":"","term":null,"rate":null,"minDep":null,"url":"https://www.greater.com.au","updated":"","status":"REVIEW","reason":""},{"country":"AU","company":"Health Professionals Bank","dcs":"Yes","paid":"","term":null,"rate":null,"minDep":null,"url":"https://www.hpbank.com.au","updated":"","status":"REVIEW","reason":""},{"country":"AU","company":"Horizon Bank","dcs":"Yes","paid":"","term":null,"rate":null,"minDep":null,"url":"https://www.horizonbank.com.au","updated":"","status":"REVIEW","reason":""},{"country":"AU","company":"HSBC Australia","dcs":"Yes","paid":"","term":null,"rate":null,"minDep":null,"url":"https://www.hsbc.com.au","updated":"","status":"REVIEW","reason":""},{"country":"AU","company":"Hume Bank","dcs":"Yes","paid":"","term":null,"rate":null,"minDep":null,"url":"https://www.humebank.com.au","updated":"","status":"REVIEW","reason":""},{"country":"AU","company":"Illawarra Credit Union","dcs":"Yes","paid":"","term":null,"rate":null,"minDep":null,"url":"https://www.illawarracu.com.au","updated":"","status":"REVIEW","reason":""},{"country":"AU","company":"Laboratories Credit Union","dcs":"Yes","paid":"","term":null,"rate":null,"minDep":null,"url":"https://www.labcu.com.au","updated":"","status":"REVIEW","reason":""},{"country":"AU","company":"Macquarie Bank","dcs":"Yes","paid":"","term":null,"rate":null,"minDep":null,"url":"https://www.macquarie.com.au","updated":"","status":"REVIEW","reason":""},{"country":"AU","company":"ME Bank","dcs":"Yes","paid":"","term":null,"rate":null,"minDep":null,"url":"https://www.mebank.com.au","updated":"","status":"REVIEW","reason":""},{"country":"AU","company":"MyState Bank","dcs":"Yes","paid":"","term":null,"rate":null,"minDep":null,"url":"https://www.mystate.com.au","updated":"","status":"REVIEW","reason":""},{"country":"AU","company":"Newcastle Permanent","dcs":"Yes","paid":"","term":null,"rate":null,"minDep":null,"url":"https://www.newcastlepermanent.com.au","updated":"","status":"REVIEW","reason":""},{"country":"AU","company":"Northern Inland Credit Union","dcs":"Yes","paid":"","term":null,"rate":null,"minDep":null,"url":"https://www.nicu.com.au","updated":"","status":"REVIEW","reason":""},{"country":"AU","company":"P&N Bank","dcs":"Yes","paid":"","term":null,"rate":null,"minDep":null,"url":"https://www.pnbank.com.au","updated":"","status":"REVIEW","reason":""},{"country":"AU","company":"People's Choice Credit Union","dcs":"Yes","paid":"","term":null,"rate":null,"minDep":null,"url":"https://www.peopleschoice.com.au","updated":"","status":"REVIEW","reason":""},{"country":"AU","company":"Police Bank","dcs":"Yes","paid":"","term":null,"rate":null,"minDep":null,"url":"https://www.policebank.com.au","updated":"","status":"REVIEW","reason":""},{"country":"AU","company":"Police Credit Union","dcs":"Yes","paid":"","term":null,"rate":null,"minDep":null,"url":"https://www.policecu.com.au","updated":"","status":"REVIEW","reason":""},{"country":"AU","company":"QBANK","dcs":"Yes","paid":"","term":null,"rate":null,"minDep":null,"url":"https://www.qbank.com.au","updated":"","status":"REVIEW","reason":""},{"country":"AU","company":"Queensland Country Bank","dcs":"Yes","paid":"","term":null,"rate":null,"minDep":null,"url":"https://www.qccu.com.au","updated":"","status":"REVIEW","reason":""},{"country":"AU","company":"Regional Australia Bank","dcs":"Yes","paid":"","term":null,"rate":null,"minDep":null,"url":"https://www.regionalaustraliabank.com.au","updated":"","status":"REVIEW","reason":""},{"country":"AU","company":"Reliance Bank","dcs":"Yes","paid":"","term":null,"rate":null,"minDep":null,"url":"https://www.reliancebank.com.au","updated":"","status":"REVIEW","reason":""},{"country":"AU","company":"Revolut Bank Australia","dcs":"Yes","paid":"","term":null,"rate":null,"minDep":null,"url":"https://www.revolut.com/en-AU","updated":"","status":"REVIEW","reason":""},{"country":"AU","company":"RSL Money","dcs":"Yes","paid":"","term":null,"rate":null,"minDep":null,"url":"https://www.rslmoney.com.au","updated":"","status":"REVIEW","reason":""},{"country":"AU","company":"Rural Bank","dcs":"Yes","paid":"","term":null,"rate":null,"minDep":null,"url":"https://www.ruralbank.com.au","updated":"","status":"REVIEW","reason":""},{"country":"AU","company":"Southern Cross Credit Union","dcs":"Yes","paid":"","term":null,"rate":null,"minDep":null,"url":"https://www.sccu.com.au","updated":"","status":"REVIEW","reason":""},{"country":"AU","company":"St George Bank","dcs":"Yes","paid":"","term":null,"rate":null,"minDep":null,"url":"https://www.stgeorge.com.au","updated":"","status":"REVIEW","reason":""},{"country":"AU","company":"SWSBANK","dcs":"Yes","paid":"","term":null,"rate":null,"minDep":null,"url":"https://www.swsbank.com.au","updated":"","status":"REVIEW","reason":""},{"country":"AU","company":"Teachers Mutual Bank","dcs":"Yes","paid":"","term":null,"rate":null,"minDep":null,"url":"https://www.tmbank.com.au","updated":"","status":"REVIEW","reason":""},{"country":"AU","company":"The Capricornian Bank","dcs":"Yes","paid":"","term":null,"rate":null,"minDep":null,"url":"https://www.capricornian.com.au","updated":"","status":"REVIEW","reason":""},{"country":"AU","company":"The MAC","dcs":"Yes","paid":"","term":null,"rate":null,"minDep":null,"url":"https://www.themac.com.au","updated":"","status":"REVIEW","reason":""},{"country":"AU","company":"The Mutual Bank","dcs":"Yes","paid":"","term":null,"rate":null,"minDep":null,"url":"https://www.themutual.com.au","updated":"","status":"REVIEW","reason":""},{"country":"AU","company":"The Shire","dcs":"Yes","paid":"","term":null,"rate":null,"minDep":null,"url":"https://www.theshire.com.au","updated":"","status":"REVIEW","reason":""},{"country":"AU","company":"Traditional Credit Union","dcs":"Yes","paid":"","term":null,"rate":null,"minDep":null,"url":"https://www.tcu.com.au","updated":"","status":"REVIEW","reason":""},{"country":"AU","company":"Transport Mutual Credit Union","dcs":"Yes","paid":"","term":null,"rate":null,"minDep":null,"url":"https://www.tmcu.com.au","updated":"","status":"REVIEW","reason":""},{"country":"AU","company":"Tyro Payments","dcs":"Yes","paid":"","term":null,"rate":null,"minDep":null,"url":"https://www.tyro.com","updated":"","status":"REVIEW","reason":""},{"country":"AU","company":"Ubank","dcs":"Yes","paid":"","term":null,"rate":null,"minDep":null,"url":"https://www.ubank.com.au","updated":"","status":"REVIEW","reason":""},{"country":"AU","company":"UniBank","dcs":"Yes","paid":"","term":null,"rate":null,"minDep":null,"url":"https://www.unibank.com.au","updated":"","status":"REVIEW","reason":""},{"country":"AU","company":"Up Bank","dcs":"Yes","paid":"","term":null,"rate":null,"minDep":null,"url":"https://up.com.au","updated":"","status":"REVIEW","reason":""},{"country":"AU","company":"WAW Credit Union","dcs":"Yes","paid":"","term":null,"rate":null,"minDep":null,"url":"https://www.bankwaw.com.au","updated":"","status":"REVIEW","reason":""},{"country":"AU","company":"Woolworths Team Bank","dcs":"Yes","paid":"","term":null,"rate":null,"minDep":null,"url":"https://www.woolworthsteam.com.au","updated":"","status":"REVIEW","reason":""}]
+const REASONS = ['Low Interest Rate (<5%)','Maturity Greater Than 1 Year','High Minimum Deposit','Non DCS/FCS Insured','Rate Expired','Company Closed','Temporarily Unavailable'];
+const LOW = REASONS[0];
+const MIN_RATE = 5;
+const STATUSES = ['APPROVED','BLACKLISTED','REVIEW'];
+
+let data = [];
+let filteredData = [];
+let countryFilter = '';
+let statusFilter = '';
+let currentPage = 1;
+const itemsPerPage = 20;
+let editingId = null;
+let hasUnsavedChanges = false;
+let sortColumn = null;
+let sortDirection = 'asc';
+let searchTimeout = null;
+let idSeq = 0;
+
+function newId() { return 'r' + (++idSeq) + '_' + Math.random().toString(36).slice(2, 6); }
+function today() {
+  const d = new Date(), p = n => String(n).padStart(2, '0');
+  return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
+}
+function esc(s) {
+  if (s == null) return '';
+  return String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+}
+function parseNum(val) {
+  if (val == null || val === '') return null;
+  const s = String(val).replace(/[$,%\s]/g, '');
+  const n = parseFloat(s);
+  return isNaN(n) ? null : n;
+}
+function termLabel(m) {
+  if (m == null) return '';
+  if (m >= 12 && m % 12 === 0) { const y = m / 12; return y + (y === 1 ? ' year' : ' years'); }
+  return m + ' months';
+}
+function parseTerm(str) {
+  const s = String(str == null ? '' : str).trim().toLowerCase();
+  if (!s) return { ok: true, m: null };
+  let x;
+  if ((x = /^(\d+(?:\.\d+)?)\s*(y|yr|yrs|year|years)$/.exec(s))) return { ok: true, m: Math.round(parseFloat(x[1]) * 12) };
+  if ((x = /^(\d+)\s*(m|mo|mos|month|months)$/.exec(s))) return { ok: true, m: parseInt(x[1], 10) };
+  if ((x = /^(\d+)$/.exec(s))) { const n = parseInt(x[1], 10); return { ok: true, m: n <= 10 ? n * 12 : n }; }
+  return { ok: false, m: null };
+}
+function money(n) { return n == null ? '' : '$' + Math.round(n).toLocaleString('en-NZ'); }
+function returnOf(rate) { return rate == null ? null : Math.round(rate * 1000); }
+function normCountry(v) {
+  const s = String(v || '').trim().toLowerCase();
+  if (/^(nz|new zealand)/.test(s)) return 'NZ';
+  if (/^(au|aus|australia)/.test(s)) return 'AU';
+  return '';
+}
+function normPaid(v) {
+  const s = String(v || '').trim().toLowerCase();
+  if (!s) return '';
+  if (/^month/.test(s)) return 'Monthly';
+  if (/^quarter/.test(s)) return 'Quarterly';
+  if (/^annual|^yearly/.test(s)) return 'Annually';
+  if (/maturity/.test(s)) return 'At Maturity';
+  return String(v).trim();
+}
+
+/* ---------- rules ---------- */
+function applyRules(rec) {
+  // Returns a note when the rule changed the record.
+  if (rec.rate != null && rec.rate < MIN_RATE) {
+    const changed = rec.status !== 'BLACKLISTED' || rec.reason !== LOW;
+    rec.status = 'BLACKLISTED'; rec.reason = LOW;
+    return changed ? rec.company + ': rate under 5%, blacklisted automatically.' : '';
+  }
+  if (rec.rate != null && rec.rate >= MIN_RATE && rec.status === 'BLACKLISTED' && rec.reason === LOW) {
+    rec.status = 'REVIEW'; rec.reason = '';
+    return rec.company + ': rate is now 5% or more, moved to Review.';
+  }
+  return '';
+}
+
+/* ---------- counts / filters ---------- */
+function updateCounts() {
+  const c = { all: data.length, NZ: 0, AU: 0, APPROVED: 0, BLACKLISTED: 0, REVIEW: 0 };
+  for (const x of data) {
+    if (x.country === 'NZ') c.NZ++; else if (x.country === 'AU') c.AU++;
+    if (x.status === 'APPROVED') c.APPROVED++; else if (x.status === 'BLACKLISTED') c.BLACKLISTED++; else c.REVIEW++;
+  }
+  for (const k in c) document.getElementById('count-' + k).textContent = c[k];
+  document.getElementById('stats').innerHTML =
+    '<span class="stat">Total Companies: <b>' + c.all + '</b></span>' +
+    '<span class="stat">Approved: <b>' + c.APPROVED + '</b></span>' +
+    '<span class="stat">Blacklisted: <b>' + c.BLACKLISTED + '</b></span>' +
+    '<span class="stat">Review: <b>' + c.REVIEW + '</b></span>' +
+    '<span class="stat">NZ: <b>' + c.NZ + '</b></span>' +
+    '<span class="stat">AU: <b>' + c.AU + '</b></span>' +
+    '<span class="stat">Showing: <b>' + filteredData.length + '</b></span>';
+}
+
+function setFilter(f) {
+  if (f === 'all') { countryFilter = ''; statusFilter = ''; }
+  else if (f === 'NZ' || f === 'AU') countryFilter = (countryFilter === f) ? '' : f;
+  else statusFilter = (statusFilter === f) ? '' : f;
+  document.querySelectorAll('.filter-btn').forEach(b => {
+    const k = b.dataset.filter;
+    b.classList.toggle('active', k === 'all' ? (!countryFilter && !statusFilter) : (k === countryFilter || k === statusFilter));
+  });
+  currentPage = 1;
+  handleSearch();
+}
+function onFilterChange() { currentPage = 1; handleSearch(); }
+function applyFilters() { currentPage = 1; handleSearch(); }
+function resetFilters() {
+  document.getElementById('fRate').value = '';
+  document.getElementById('fTerm').value = '';
+  document.getElementById('fDep').value = '';
+  sortColumn = null; sortDirection = 'asc'; updateSortIndicators();
+  onFilterChange();
+}
+function handleSearchLive() {
+  clearTimeout(searchTimeout);
+  searchTimeout = setTimeout(() => { currentPage = 1; handleSearch(); }, 150);
+}
+function haystack(x) {
+  const parts = [x.company, x.country, x.country === 'NZ' ? 'new zealand' : 'australia', x.dcs, x.paid,
+    termLabel(x.term), x.term != null ? x.term + ' months' : '', x.rate != null ? x.rate.toFixed(2) + ' ' + x.rate + '%' : '',
+    x.minDep, x.status, x.reason, x.url, x.updated];
+  return parts.join(' ').toLowerCase();
+}
+function passesTableFilters(x) {
+  const ft = document.getElementById('fTerm').value;
+  const fd = document.getElementById('fDep').value;
+  if (ft) {
+    if (x.term == null) return false;
+    if (ft === 't12' && !(x.term >= 0 && x.term <= 12)) return false;
+    if (ft === 't24' && !(x.term > 12 && x.term <= 24)) return false;
+    if (ft === 't48' && !(x.term > 24 && x.term <= 48)) return false;
+    if (ft === 't60' && !(x.term >= 60)) return false;
+  }
+  if (fd) {
+    if (x.minDep == null) return false;
+    if (fd === 'd10' && !(x.minDep >= 1 && x.minDep <= 10000)) return false;
+    if (fd === 'd50' && !(x.minDep >= 10 && x.minDep <= 50000)) return false;
+    if (fd === 'd100' && !(x.minDep >= 100000)) return false;
+  }
+  return true;
+}
+function handleSearch() {
+  const tokens = document.getElementById('search').value.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  filteredData = data.filter(x => {
+    if (countryFilter && x.country !== countryFilter) return false;
+    if (statusFilter && x.status !== statusFilter) return false;
+    if (!passesTableFilters(x)) return false;
+    if (tokens.length) { const h = haystack(x); for (const t of tokens) if (!h.includes(t)) return false; }
+    return true;
+  });
+  const rateOrder = document.getElementById('fRate').value;
+  if (rateOrder) { filteredData.sort((a,b) => { if (a.rate == null && b.rate == null) return 0; if (a.rate == null) return 1; if (b.rate == null) return -1; return (a.rate-b.rate) * (rateOrder === 'asc' ? 1 : -1); }); } else applySort();
+  updateCounts();
+  renderTable();
+}
+
+/* ---------- sorting ---------- */
+function sortValue(x, col) {
+  switch (col) {
+    case 'country': return x.country;
+    case 'company': return x.company.toLowerCase();
+    case 'term': return x.term;
+    case 'rate': return x.rate;
+    case 'minDep': return x.minDep;
+    case 'ret': return returnOf(x.rate);
+    case 'updated': return x.updated || null;
+    case 'status': return x.status;
+    default: return null;
+  }
+}
+function applySort() {
+  if (!sortColumn) return;
+  const dir = sortDirection === 'asc' ? 1 : -1;
+  filteredData.sort((a, b) => {
+    const va = sortValue(a, sortColumn), vb = sortValue(b, sortColumn);
+    if (va == null && vb == null) return 0;
+    if (va == null) return 1;
+    if (vb == null) return -1;
+    if (va < vb) return -1 * dir;
+    if (va > vb) return 1 * dir;
+    return 0;
+  });
+}
+function toggleSort(col) {
+  if (sortColumn === col) {
+    if (sortDirection === 'asc') sortDirection = 'desc';
+    else { sortColumn = null; sortDirection = 'asc'; }
+  } else { sortColumn = col; sortDirection = (col === 'rate' || col === 'ret' || col === 'updated') ? 'desc' : 'asc'; }
+  updateSortIndicators();
+  currentPage = 1;
+  handleSearch();
+}
+function updateSortIndicators() {
+  document.querySelectorAll('th.sortable').forEach(th => {
+    th.classList.remove('sorted-asc', 'sorted-desc');
+    if (th.dataset.sort === sortColumn) th.classList.add(sortDirection === 'asc' ? 'sorted-asc' : 'sorted-desc');
+  });
+}
+
+/* ---------- table ---------- */
+function domainOf(u) { return String(u).replace(/^https?:\/\//i, '').replace(/\/$/, ''); }
+function renderTable() {
+  const tbody = document.getElementById('tbody');
+  document.getElementById('empty').style.display = filteredData.length ? 'none' : 'block';
+  if (!filteredData.length) { tbody.innerHTML = ''; renderPagination(); return; }
+  const start = (currentPage - 1) * itemsPerPage;
+  const pageData = filteredData.slice(start, start + itemsPerPage);
+  let html = '';
+  for (let i = 0; i < pageData.length; i++) {
+    const x = pageData[i];
+    let cls = '', st = 'REVIEW', stc = 'review';
+    if (x.status === 'BLACKLISTED') { cls = 'blacklisted'; st = 'BLACKLISTED'; stc = 'blackText'; }
+    else if (x.status === 'APPROVED') { cls = 'approved'; st = 'APPROVED'; stc = 'approvedText'; }
+    if (x.id === editingId) cls += ' selected';
+    const reason = x.status === 'BLACKLISTED' ? (x.reason || 'Choose') : (x.status === 'APPROVED' ? 'Approved' : 'None');
+    const low = x.rate != null && x.rate < MIN_RATE;
+    html += '<tr class="' + cls.trim() + '" data-id="' + x.id + '">';
+    html += '<td class="row-number">' + (start + i + 1) + '</td>';
+    html += '<td class="cc">' + esc(x.country) + '</td>';
+    html += '<td class="company">' + esc(x.company) + '</td>';
+    html += '<td class="coverage ' + (x.dcs === 'Yes' ? 'yes' : 'no') + '">' + (x.dcs === 'Yes' ? '✓' : '✕') + '</td>';
+    html += '<td>' + (x.paid ? esc(x.paid) : '&ndash;') + '</td>';
+    html += '<td>' + (x.term != null ? termLabel(x.term) : '&ndash;') + '</td>';
+    html += '<td class="num rate' + (low ? ' low' : '') + '">' + (x.rate != null ? x.rate.toFixed(2) + '%' : '&ndash;') + '</td>';
+    html += '<td class="num">' + (x.minDep != null ? money(x.minDep) : '&ndash;') + '</td>';
+    html += '<td class="url">' + (x.url ? '<a href="' + esc(x.url) + '" target="_blank" rel="noopener noreferrer">' + esc(domainOf(x.url)) + '</a>' : '&ndash;') + '</td>';
+    html += '<td class="status ' + stc + '">' + st + '</td>';
+    html += '<td>' + esc(reason) + '</td>';
+    html += '<td class="actions">';
+    html += '<button data-action="edit">Edit</button>';
+    html += '<button class="approve" data-action="approve">Approve</button>';
+    html += '<button class="blacklist" data-action="blacklist">Blacklist</button>';
+    html += '<button class="review-btn" data-action="review">Review</button>';
+    html += '<button class="danger" data-action="delete">Delete</button>';
+    html += '</td>';
+    html += '<td>' + (x.updated ? esc(x.updated) : '&ndash;') + '</td></tr>';
+  }
+  tbody.innerHTML = html;
+  renderPagination();
+}
+
+function renderPagination() {
+  const p = document.getElementById('pagination');
+  const total = Math.ceil(filteredData.length / itemsPerPage) || 1;
+  if (total <= 1) { p.innerHTML = ''; return; }
+  let html = '';
+  html += '<button onclick="changePage(1)"' + (currentPage === 1 ? ' disabled' : '') + '>&laquo; First</button>';
+  html += '<button onclick="changePage(' + (currentPage - 1) + ')"' + (currentPage === 1 ? ' disabled' : '') + '>&lsaquo; Prev</button>';
+  for (let i = 1; i <= total; i++) {
+    if (i === currentPage) html += '<button disabled style="font-weight:700;background:#2563eb;border-color:#2563eb;">' + i + '</button>';
+    else html += '<button onclick="changePage(' + i + ')">' + i + '</button>';
+  }
+  html += '<button onclick="changePage(' + (currentPage + 1) + ')"' + (currentPage === total ? ' disabled' : '') + '>Next &rsaquo;</button>';
+  html += '<button onclick="changePage(' + total + ')"' + (currentPage === total ? ' disabled' : '') + '>Last &raquo;</button>';
+  html += '<span class="page-info">Page ' + currentPage + ' of ' + total + '</span>';
+  p.innerHTML = html;
+}
+function changePage(p) {
+  const total = Math.ceil(filteredData.length / itemsPerPage) || 1;
+  currentPage = Math.max(1, Math.min(p, total));
+  renderTable();
+}
+
+document.getElementById('tbody').addEventListener('click', function(e) {
+  if (e.target.closest('a')) return;
+  const row = e.target.closest('tr[data-id]');
+  if (!row) return;
+  const id = row.getAttribute('data-id');
+  const rec = data.find(x => x.id === id);
+  if (!rec) return;
+  const action = e.target.closest('button[data-action]');
+  if (action) {
+    e.preventDefault(); e.stopPropagation();
+    const a = action.getAttribute('data-action');
+    if (a === 'edit') editCompany(id);
+    else if (a === 'approve') setStatus(id, 'APPROVED');
+    else if (a === 'blacklist') setStatus(id, 'BLACKLISTED');
+    else if (a === 'review') setStatus(id, 'REVIEW');
+    else if (a === 'delete') deleteCompany(id);
+  } else {
+    editCompany(id);
+  }
+});
+
+function setStatus(id, status) {
+  const x = data.find(r => r.id === id);
+  if (!x) return;
+  if (status === 'APPROVED' && x.rate != null && x.rate < MIN_RATE) {
+    alert(x.company + ' has a rate under 5%, so it cannot be approved. Update the rate first.');
+    return;
+  }
+  x.status = status;
+  if (status === 'BLACKLISTED') { if (x.rate != null && x.rate < MIN_RATE) x.reason = LOW; }
+  else x.reason = '';
+  x.updated = today();
+  hasUnsavedChanges = true;
+  editCompany(id);
+  setSaveStatus(x.company + ' set to ' + status + (status === 'BLACKLISTED' && !x.reason ? '. Choose a Blacklist Reason and click Update.' : '. Click Save to download CSV.'));
+  handleSearch();
+}
+
+/* ---------- form ---------- */
+function updateReturnField() {
+  const r = parseNum(document.getElementById('rate').value);
+  const retField = document.getElementById('ret'); if (retField) retField.value = r == null ? '' : money(returnOf(r));
+}
+function getFormItem() {
+  const company = document.getElementById('company').value.trim();
+  const country = document.getElementById('country').value;
+  const dcs = document.getElementById('dcs').value;
+  const status = document.getElementById('status').value;
+  const reason = document.getElementById('blacklistReason').value.trim();
+  const req = [['Company', 'company', company], ['Country', 'country', country], ['DCS/FCS', 'dcs', dcs], ['Status', 'status', status]];
+  for (const [label, id, v] of req) {
+    if (!v) { alert('Please complete: ' + label); document.getElementById(id).focus(); return null; }
+  }
+  const rateRaw = document.getElementById('rate').value.trim();
+  const rate = parseNum(rateRaw);
+  if (rateRaw && rate == null) { alert('Rate must be a number, for example 5.25'); document.getElementById('rate').focus(); return null; }
+  const t = parseTerm(document.getElementById('term').value);
+  if (!t.ok) { alert('Term not understood. Use for example: 6 months, 1 year, 18 months, 3 years.'); document.getElementById('term').focus(); return null; }
+  const depRaw = document.getElementById('minDep').value.trim();
+  const dep = parseNum(depRaw);
+  if (depRaw && dep == null) { alert('Minimum Deposit must be a number, for example 5000'); document.getElementById('minDep').focus(); return null; }
+  if (status === 'APPROVED' && rate == null) { alert('Enter a Rate before approving.'); document.getElementById('rate').focus(); return null; }
+  if (status === 'BLACKLISTED' && !reason && !(rate != null && rate < MIN_RATE)) { alert('Please choose a Blacklist Reason.'); document.getElementById('blacklistReason').focus(); return null; }
+  let url = document.getElementById('url').value.trim();
+  if (url && !/^https?:\/\//i.test(url)) url = 'https://' + url;
+  return {
+    country, company, dcs, paid: document.getElementById('paid').value,
+    term: t.m, rate, minDep: dep, url, updated: today(), status,
+    reason: status === 'BLACKLISTED' ? reason : ''
+  };
+}
+function dupExists(item, exceptId) {
+  return data.some(x => x.id !== exceptId && x.country === item.country && x.company.toLowerCase() === item.company.toLowerCase());
+}
+function addCompany() {
+  const item = getFormItem();
+  if (!item) return;
+  if (dupExists(item, null)) { alert(item.company + ' (' + item.country + ') already exists.'); return; }
+  item.id = newId();
+  const note = applyRules(item);
+  data.push(item);
+  hasUnsavedChanges = true;
+  editingId = null;
+  resetForm();
+  document.getElementById('search').value = '';
+  setFilter('all');
+  setSaveStatus('Added ' + item.company + '. ' + (note ? note + ' ' : '') + 'Click Save to download CSV.');
+  if (note) alert(note);
+}
+function updateCompany() {
+  if (!editingId) { alert('Select a row first.'); return; }
+  const item = getFormItem();
+  if (!item) return;
+  if (dupExists(item, editingId)) { alert(item.company + ' (' + item.country + ') already exists.'); return; }
+  const i = data.findIndex(x => x.id === editingId);
+  if (i < 0) return;
+  item.id = editingId;
+  const note = applyRules(item);
+  data[i] = item;
+  hasUnsavedChanges = true;
+  editCompany(item.id);
+  handleSearch();
+  setSaveStatus('Updated ' + item.company + '. ' + (note ? note + ' ' : '') + 'Click Save to download CSV.');
+  if (note) alert(note);
+}
+function editCompany(id) {
+  const x = data.find(r => r.id === id);
+  if (!x) return;
+  editingId = id;
+  document.getElementById('company').value = x.company;
+  document.getElementById('country').value = x.country;
+  document.getElementById('dcs').value = x.dcs || 'Yes';
+  document.getElementById('paid').value = x.paid || '';
+  const paidSel = document.getElementById('paid');
+  if (x.paid && paidSel.value !== x.paid) { const o = document.createElement('option'); o.textContent = x.paid; paidSel.appendChild(o); paidSel.value = x.paid; }
+  document.getElementById('term').value = termLabel(x.term);
+  document.getElementById('rate').value = x.rate != null ? x.rate : '';
+  document.getElementById('minDep').value = x.minDep != null ? x.minDep : '';
+  document.getElementById('url').value = x.url || '';
+  document.getElementById('status').value = x.status || 'REVIEW';
+  document.getElementById('blacklistReason').value = x.reason || '';
+  updateReturnField();
+  updateBlacklistReasonState();
+  document.getElementById('editingBanner').classList.add('active');
+  document.getElementById('editingName').textContent = x.company + ' (' + x.country + ')';
+  document.getElementById('updateBtn').disabled = false;
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+  renderTable();
+}
+function deleteCompany(id) {
+  const x = data.find(r => r.id === id);
+  if (!x) return;
+  if (!confirm('Delete ' + x.company + ' (' + x.country + ')?')) return;
+  data = data.filter(r => r.id !== id);
+  if (editingId === id) resetForm();
+  hasUnsavedChanges = true;
+  handleSearch();
+  setSaveStatus('Deleted ' + x.company + '. Click Save to download CSV.');
+}
+function resetForm() {
+  ['company','country','paid','term','rate','minDep','url','status','blacklistReason'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('dcs').value = 'Yes';
+  updateBlacklistReasonState();
+  editingId = null;
+  document.getElementById('editingBanner').classList.remove('active');
+  document.getElementById('editingName').textContent = '';
+  document.getElementById('updateBtn').disabled = true;
+  renderTable();
+}
+function updateBlacklistReasonState() {
+  const status = document.getElementById('status').value;
+  document.getElementById('blacklistReason').disabled = status !== 'BLACKLISTED';
+  document.getElementById('blacklistReasonLabel').classList.toggle('required-field', status === 'BLACKLISTED');
+  if (status !== 'BLACKLISTED') document.getElementById('blacklistReason').value = '';
+}
+function clearSearch() { document.getElementById('search').value = ''; currentPage = 1; handleSearch(); }
+function setSaveStatus(msg) { document.getElementById('saveStatus').textContent = msg; }
+
+/* ---------- CSV import / export ---------- */
+function parseRows(text) {
+  const rows = [];
+  let row = [], field = '', inQuotes = false;
+  text = String(text || '').replace(/^\uFEFF/, '');
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (c === '"') {
+      if (inQuotes && text[i + 1] === '"') { field += '"'; i++; }
+      else inQuotes = !inQuotes;
+    } else if (c === ',' && !inQuotes) { row.push(field.trim()); field = ''; }
+    else if ((c === '\n' || c === '\r') && !inQuotes) {
+      if (c === '\r' && text[i + 1] === '\n') i++;
+      row.push(field.trim()); field = '';
+      if (row.some(v => v !== '')) rows.push(row);
+      row = [];
+    } else field += c;
+  }
+  if (field !== '' || row.length) { row.push(field.trim()); if (row.some(v => v !== '')) rows.push(row); }
+  return rows;
+}
+const HEADER_MAP = {
+  country: 'country', company: 'company', institution: 'company', name: 'company',
+  dcsfcs: 'dcs', dcsfcscover: 'dcs', paid: 'paid', term: 'term',
+  rate: 'rate', interestrate: 'rate', interestrangepa: 'rate',
+  minimumdeposit: 'minDep', mindeposit: 'minDep', minmaxinvestment: 'minDep',
+  companyurl: 'url', url: 'url', link: 'url', website: 'url', websiteurl: 'url',
+  lastupdated: 'updated', lastverified: 'updated', status: 'status',
+  blacklistreason: 'reason', reason: 'reason'
+};
+function importCSV(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(evt) {
+    try {
+      const res = mergeRows(parseRows(evt.target.result));
+      if (res.error) { alert(res.error); return; }
+      hasUnsavedChanges = true;
+      handleSearch();
+      setSaveStatus('Import done: ' + res.added + ' added, ' + res.updated + ' updated' + (res.skipped ? ', ' + res.skipped + ' rows skipped' : '') + '. Total ' + data.length + ' companies.');
+      alert('Imported: ' + res.added + ' added, ' + res.updated + ' updated' + (res.skipped ? ', ' + res.skipped + ' rows skipped' : '') + '.' + (res.notes.length ? '\n\n' + res.notes.slice(0, 8).join('\n') + (res.notes.length > 8 ? '\n...and ' + (res.notes.length - 8) + ' more' : '') : ''));
+    } catch (err) { alert('Error: ' + err.message); }
+  };
+  reader.readAsText(file);
+  e.target.value = '';
+}
+function mergeRows(rows) {
+  if (rows.length < 2) return { error: 'No valid data found.' };
+  let map = null, section = 'NZ';
+  let added = 0, updated = 0, skipped = 0;
+  const notes = [];
+  for (const r of rows) {
+    const norm = r.map(h => String(h).toLowerCase().replace(/[^a-z0-9]/g, ''));
+    if (norm.includes('company') || norm.includes('institution')) {
+      map = {};
+      norm.forEach((h, i) => { if (HEADER_MAP[h] && map[HEADER_MAP[h]] === undefined) map[HEADER_MAP[h]] = i; });
+      continue;
+    }
+    if (!map) continue;
+    const rest = r.slice(1).some(v => v !== '');
+    if (r[0] && !rest) {
+      const c = normCountry(r[0]);
+      if (c) section = c;
+      continue;
+    }
+    const get = k => (map[k] !== undefined && r[map[k]] !== undefined) ? String(r[map[k]]).trim() : '';
+    const name = get('company');
+    if (!name || /^total/i.test(name) || /^total/i.test(r[0])) continue;
+    const country = map.country !== undefined ? normCountry(get('country')) : section;
+    if (!country) { skipped++; continue; }
+    let rec = data.find(x => x.country === country && x.company.toLowerCase() === name.toLowerCase());
+    const isNew = !rec;
+    if (isNew) rec = { id: newId(), country, company: name, dcs: 'Yes', paid: '', term: null, rate: null, minDep: null, url: '', updated: '', status: 'REVIEW', reason: '' };
+    let touched = false;
+    const dv = get('dcs'); if (dv) { rec.dcs = /^(no|n|0|false)$/i.test(dv) ? 'No' : 'Yes'; touched = true; }
+    const pv = get('paid'); if (pv) { rec.paid = normPaid(pv); touched = true; }
+    const tv = get('term'); if (tv) { const t = parseTerm(tv); if (t.ok && t.m != null) { rec.term = t.m; touched = true; } else notes.push(name + ': term "' + tv + '" not understood'); }
+    const rv = get('rate');
+    if (rv) { const ns = (rv.replace(/,/g, '').match(/\d+(?:\.\d+)?/g) || []).map(Number); if (ns.length) { rec.rate = Math.max.apply(null, ns); touched = true; } }
+    const mv = get('minDep'); if (mv) { const ns = (mv.replace(/,/g, '').match(/\d+(?:\.\d+)?/g) || []).map(Number); if (ns.length) { rec.minDep = ns[0]; touched = true; } }
+    const uv = get('url'); if (uv) { rec.url = /^https?:\/\//i.test(uv) ? uv : 'https://' + uv; touched = true; }
+    const sv = get('status').toUpperCase();
+    if (STATUSES.includes(sv)) { rec.status = sv; rec.reason = sv === 'BLACKLISTED' ? get('reason') : ''; touched = true; }
+    const upd = get('updated');
+    if (upd) rec.updated = upd; else if (touched || isNew) rec.updated = today();
+    const note = applyRules(rec);
+    if (note) notes.push(note);
+    if (isNew) { data.push(rec); added++; } else updated++;
+  }
+  if (!added && !updated) return { error: 'No valid data found. The file needs a header row with Company (or Institution).' };
+  return { added, updated, skipped, notes };
+}
+
+function saveDatabase() {
+  downloadCSV(data, 'All');
+  hasUnsavedChanges = false;
+  setSaveStatus('Saved! CSV downloaded (' + data.length + ' companies).');
+}
+function buildCSV(sourceData) {
+  const rows = [['Country','Company','DCS/FCS','Paid','Term','Rate','Min-Deposit','Company URL','Status','Blacklist Reason','Last Updated']];
+  for (const x of sourceData) {
+    rows.push([x.country, x.company, x.dcs, x.paid, termLabel(x.term), x.rate != null ? x.rate.toFixed(2) + '%' : '',
+      x.minDep != null ? x.minDep : '', x.url, x.status, x.reason, x.updated]);
+  }
+  return rows.map(r => r.map(v => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"').join(',')).join('\r\n');
+}
+function showExportMenu() {
+  const choice = prompt('Export:\n1 = All\n2 = NZ Only\n3 = AU Only\n4 = Approved\n5 = Blacklisted\n6 = Review\n7 = Current Filter (what the table shows now)\n\nEnter 1-7:');
+  if (choice === null) return;
+  let source = data, label = 'All';
+  if (choice === '2') { source = data.filter(x => x.country === 'NZ'); label = 'NZ'; }
+  else if (choice === '3') { source = data.filter(x => x.country === 'AU'); label = 'AU'; }
+  else if (choice === '4') { source = data.filter(x => x.status === 'APPROVED'); label = 'Approved'; }
+  else if (choice === '5') { source = data.filter(x => x.status === 'BLACKLISTED'); label = 'Blacklisted'; }
+  else if (choice === '6') { source = data.filter(x => x.status === 'REVIEW'); label = 'Review'; }
+  else if (choice === '7') { source = filteredData.slice(); label = 'Current_Filter'; }
+  else if (choice !== '1') { alert('Enter 1-7'); return; }
+  downloadCSV(source, label);
+}
+function downloadCSV(sourceData, label) {
+  const csv = '\uFEFF' + buildCSV(sourceData);
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'Deposit_Takers_' + label + '_' + today() + '.csv';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  setSaveStatus('Exported ' + sourceData.length + ' companies (' + label + ').');
+}
+
+window.addEventListener('beforeunload', function(e) {
+  if (hasUnsavedChanges) { e.preventDefault(); e.returnValue = ''; }
+});
+
+function init() {
+  const sel = document.getElementById('blacklistReason');
+  REASONS.forEach(r => { const o = document.createElement('option'); o.textContent = r; sel.appendChild(o); });
+  data = MASTER.map(r => Object.assign({ id: newId() }, r));
+  data.forEach(applyRules);
+  filteredData = [];
+  currentPage = 1;
+  hasUnsavedChanges = false;
+  sortColumn = null;
+  sortDirection = 'asc';
+  updateBlacklistReasonState();
+  updateSortIndicators();
+  setFilter('all');
+  const nz = data.filter(x => x.country === 'NZ').length, au = data.filter(x => x.country === 'AU').length;
+  setSaveStatus('Loaded ' + data.length + ' companies (NZ ' + nz + ', AU ' + au + ').');
+}
+window.addEventListener('load', init);
+</script>
+</body>
+</html>
